@@ -153,6 +153,8 @@ function exec(opts, client, cmd, callback) {
 function build(opts, rules, callback) {
 	var intercept = opts.intercept || defIntercept;
 
+	rules = rules || {};
+
 	try {
 		var ruleOrder = [];
 			ruleOrder = ruleOrder.concat(rules.date ? {key: 'date', value: rules.date}: []);
@@ -160,7 +162,7 @@ function build(opts, rules, callback) {
 			ruleOrder = ruleOrder.concat(rules.to && rules.to.length ? {key: 'to', value: rules.to}: []);
 			ruleOrder = ruleOrder.concat(rules.cc && rules.cc.length ? {key: 'cc', value: rules.cc}: []);
 			ruleOrder = ruleOrder.concat(rules.bcc && rules.bcc.length ? {key: 'bcc', value: rules.bcc}: []);
-			ruleOrder = ruleOrder.concat(rules.subject ? {key: 'subject', value: rules.subject}: []);
+			ruleOrder = ruleOrder.concat(rules.subject ? {key: 'subject', value: rules.subject.text}: []);
 			ruleOrder.push({key: 'MIME'});
 			for (var c in rules.contents) {
 				ruleOrder.push({key: 'contents', value: rules.contents[c]});

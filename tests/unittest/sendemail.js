@@ -38,7 +38,9 @@ var rules = {
 			"email": "dgofman@gmail.com"
 		}
 	],
-	"subject": "My Attachment with Logo",
+	"subject": {
+		"text": "My Attachment with Logo"
+	},
 	"contents": [
 		{
 			"template": dir + "/tests/templates/template_logo.html",
@@ -106,7 +108,7 @@ describe('SendMailJS build and send', function () {
 	it('should test missing rules', function(done) {
 		var mail = sendemail({
 		});
-		mail.build({}, function(err) {
+		mail.build(null, function(err) {
 			assert.ok(err === null);
 			done();
 		});

@@ -38,7 +38,9 @@ var rules = {
 	],
 	"bcc": [
 	],
-	"subject": "My Attachment with Logo",
+	"subject": {
+		"text": "My Attachment with Logo"
+	},
 	"contents": [
 		{
 			"template": __dirname + "/templates/template_logo.html",
