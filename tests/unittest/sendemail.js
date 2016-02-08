@@ -112,6 +112,23 @@ describe('SendMailJS build and send', function () {
 		});
 	});
 
+	it('should test intercent function to replace image', function(done) {
+		var mail = sendemail({	
+			username: username,
+			intercept: function(next, rulekey, rulevalue) {
+				if (rulekey === 'attachments' && rulevalue.name === 'avatar.png') {
+					rulevalue.data = new Buffer(fs.readFileSync(dir + "/tests/images/indigo_logo.png")).toString('base64');
+				}
+				next();
+			}
+		});
+
+		mail.build(rules, function(err) {
+			assert.ok(err === null);
+			done();
+		});
+	});
+
 	it('should test error on missing hosts', function(done) {
 		var mail = sendemail({
 			hosts: []
@@ -150,25 +167,6 @@ describe('SendMailJS build and send', function () {
 			mail.send([], function(err, result) {
 				assert.ok(err === null);
 				assert.equal(result, 'SENT');
-				done();
-			});
-		});
-	});
-
-	it('should test intercent function to replace image', function(done) {
-		createServer(function(server) {
-			var mail = sendemail({	
-				username: username,
-				intercept: function(next, rulekey, rulevalue, ruleindex) {
-					if (rulekey === 'attachments' && rulevalue.name === 'avatar.png') {
-						rulevalue.data = new Buffer(fs.readFileSync(dir + "/tests/images/indigo_logo.png")).toString('base64');
-					}
-					next();
-				}
-			});
-
-			mail.build(rules, function(err, cmdLines) {
-				assert.ok(err === null);
 				done();
 			});
 		});
