@@ -87,8 +87,10 @@ describe('SendMailJS build and send', function () {
 	it('should test build command', function(done) {
 		var mail = sendemail({
 		});
-		mail.build(rules, function(err) {
+		mail.build(rules, function(err, cmdLines, info) {
 			assert.ok(err === null);
+			assert(info.contents.length, 3);
+			assert(info.attachments.length, 2);
 			done();
 		});
 	});
@@ -209,7 +211,7 @@ describe('SendMailJS build and send', function () {
 				});
 			});
 
-			mail.send([], function(err) {
+			mail.send([['']], function(err) {
 				assert.ok(err !== null);
 				done();
 			});

@@ -52,7 +52,7 @@ describe('SendMailJS connect and exec', function () {
 					port: port,	
 					username: username,
 					shell: false, 
-					console: function(state, data) {
+					debug: function(state, data) {
 						assert.equal(state, sendemail.DEBUG);
 						assert.equal(data, 'ready: localhost', 'DEBUG');
 					}
@@ -76,7 +76,8 @@ describe('SendMailJS connect and exec', function () {
 	it('should test Error: (SSH) Channel open failure', function(done) {
 		createServer(function(server) {
 			var mail = sendemail({
-					hosts: [host_name],
+					hosts: [host_name, '192.168.1.10'],
+					hostIndex: 0,
 					port: port,	
 					username: username,
 					privateKey: HOST_KEY_RSA,
@@ -106,7 +107,7 @@ describe('SendMailJS connect and exec', function () {
 					username: username,
 					password: password,
 					shell: true,
-					console: function(state, data) {
+					debug: function(state, data) {
 						states[state] = data;
 						if (state === sendemail.CLOSE) {
 							assert.equal(states[sendemail.DEBUG], 'ready: localhost', 'DEBUG');
@@ -159,7 +160,7 @@ describe('SendMailJS connect and exec', function () {
 					username: username,
 					password: password,
 					shell: true,
-					console: function (state, data) {
+					debug: function (state, data) {
 						states[state] = data;
 						if (state === sendemail.CLOSE) {
 							assert.equal(states[sendemail.DEBUG], 'ready: localhost', 'DEBUG');
@@ -227,7 +228,7 @@ describe('SendMailJS connect and exec', function () {
 		});
 	});
 
-	it('should test connection close before execute command with console monitoring', function(done) {
+	it('should test connection close before execute command with debug monitoring', function(done) {
 		createServer(function(server) {
 			var states = {},
 				mail = sendemail({
@@ -235,7 +236,7 @@ describe('SendMailJS connect and exec', function () {
 					port: port,	
 					username: username,
 					shell: false,
-					console: function (state, data) {
+					debug: function (state, data) {
 							states[state] = data;
 							if (state === sendemail.STDERR) {
 								assert.equal(states[sendemail.DEBUG], 'ready: localhost', 'DEBUG');
@@ -269,7 +270,7 @@ describe('SendMailJS connect and exec', function () {
 					port: port,	
 					username: username,
 					shell: false,
-					console: function (state, data) {
+					debug: function (state, data) {
 							states[state] = data;
 							if (state === sendemail.CLOSE) {
 								assert.equal(states[sendemail.DEBUG], 'ready: localhost', 'DEBUG');
@@ -315,7 +316,7 @@ describe('SendMailJS connect and exec', function () {
 					port: port,	
 					username: username,
 					shell: false,
-					console: function (state, data) {
+					debug: function (state, data) {
 							states[state] = data;
 							if (state === sendemail.CLOSE) {
 								assert.equal(states[sendemail.DEBUG], 'ready: localhost', 'DEBUG');

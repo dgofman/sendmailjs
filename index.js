@@ -23,13 +23,14 @@ var ssh2 = require('ssh2'),
 
 	{
 		hosts: [192.168.1.233, 192.168.1.234, ...], //ip address of VMs
+		hostIndex: 0,		//{Optional} (default 0) start index from the hosts list
 		port: 22,			//ssh port
 		username: admin,	//login name
 		password: pwd,		//password {Optional}: if privateKey missing
 		privateKey: pks, 	//privateKeyString,
 		shell: false,		//open SSH shell,
 		timeout: 2000,		//connect timeout,
-		console: function(state, data) { //{Optional} - output console
+		debug: function(state, data) { //{Optional} - debug output
 			console.log(state, data);	 //state - 5 states: CLOSE/EXIT/STDOUT/STDERR/DEBUG
 		}),								 //data - output value
 		intercept: function(next, rulekey, rulevalue, ruleindex) { 	//{Optional} - intercept while building an email body. Customizing boundary block
@@ -39,18 +40,32 @@ var ssh2 = require('ssh2'),
 																	//ruleindex - the rule order index
 */
 module.exports = sendmailjs = function(opts) {
-	opts.connectIndex = 0;
+	opts.hostIndex = opts.hostIndex || 0;
+	opts.hosts = opts.hosts || ['localhost'];
+	opts.port = opts.port || 22;
 
 	return {
+		/**
+			callback(err, client, stream);
+		*/
 		connect: function(callback) {
 			connect(opts, callback);
 		},
+		/*
+			callback(null, stream);
+		*/
 		exec: function(client, cmd, callback) {
 			exec(opts, client, cmd, callback);
 		},
+		/**
+			callback(err, cmdLines, resourceInfo);
+		*/
 		build: function(rules, callback) {
 			build(opts, rules, callback);
 		},
+		/**
+			callback(err, status);
+		*/
 		send: function(cmdLines, callback) {
 			send(opts, cmdLines, callback);
 		}
@@ -59,15 +74,11 @@ module.exports = sendmailjs = function(opts) {
 
 //private function
 function connect(opts, callback) {
-	var console = opts.console || defConsole;
+	var debug = opts.debug || defConsole;
 
-	if (opts.connectIndex >= opts.hosts.length) {
-		opts.connectIndex = 0;
-	}
-
-	if (opts.hosts && opts.connectIndex < opts.hosts.length) {
+	if (opts.hostIndex < opts.hosts.length) {
 		var client = new ssh2(),
-			ip = opts.hosts[opts.connectIndex++],
+			ip = opts.hosts[opts.hostIndex++],
 			node = {
 				host: ip,
 				port: opts.port,
@@ -85,7 +96,7 @@ function connect(opts, callback) {
 		client.ip = ip;
 
 		client.on('ready', function() {
-			console(sendmailjs.DEBUG, 'ready: ' + ip);
+			debug(sendmailjs.DEBUG, 'ready: ' + ip);
 
 			if (opts.shell === true) {
 				client.shell(function(err, stream) {
@@ -94,19 +105,19 @@ function connect(opts, callback) {
 						return callback(err);
 					}
 					stream.on('exit', function(code) {
-						console(sendmailjs.EXIT, code);
+						debug(sendmailjs.EXIT, code);
 						client.end();
 					});
 					stream.on('close', function() {
-						console(sendmailjs.CLOSE, ip);
+						debug(sendmailjs.CLOSE, ip);
 						client.end();
 					});
 					stream.on('data', function(data) {
-						console(sendmailjs.STDOUT, data.toString());
+						debug(sendmailjs.STDOUT, data.toString());
 					});
 					stream.stderr.on('data', function(data) {
 						code = -1;
-						console(sendmailjs.STDERR, data.toString());
+						debug(sendmailjs.STDERR, data.toString());
 					});
 					callback(null, client, stream);
 				});
@@ -115,35 +126,39 @@ function connect(opts, callback) {
 			}
 		}).connect(node);
 	} else {
-		console(sendmailjs.DEBUG, 'Missing host list');
+		debug(sendmailjs.DEBUG, 'Missing host list');
 		callback(new Error('Missing host list'), null);
+	}
+
+	if (opts.hostIndex >= opts.hosts.length) {
+		opts.hostIndex = 0;
 	}
 }
 
 //private function
 function exec(opts, client, cmd, callback) {
-	var console = opts.console || defConsole;
+	var debug = opts.debug || defConsole;
 
 	client.exec(cmd, { pty: false }, function(err, stream) {
 		var stderr = '';
 		if (err) {
-			console(sendmailjs.STDERR, err.toString());
+			debug(sendmailjs.STDERR, err.toString());
 			return callback(err);
 		}
 		stream.on('exit', function(code) {
-			console(sendmailjs.EXIT, code);
+			debug(sendmailjs.EXIT, code);
 			client.end();
 		});
 		stream.on('close', function() {
-			console(sendmailjs.CLOSE, client.ip);
+			debug(sendmailjs.CLOSE, client.ip);
 			client.end();
 		});
 		stream.on('data', function(data) {
-			console(sendmailjs.STDOUT, data.toString());
+			debug(sendmailjs.STDOUT, data.toString());
 		});
 		stream.stderr.on('data', function(data) {
 			stderr += data;
-			console(sendmailjs.STDERR, data.toString());
+			debug(sendmailjs.STDERR, data.toString());
 		});
 		callback(null, stream);
 	});
@@ -172,7 +187,11 @@ function build(opts, rules, callback) {
 			}
 
 			var ruleindex = -1,
-				cmdLines = ['('],
+				cmdLines = [],
+				info = {
+					contents: [],
+					attachments: []
+				},
 				unescape = function(str) {
 					if (str !== null && str !== undefined) {
 						return str.replace('\'', '\\047');
@@ -205,9 +224,7 @@ function build(opts, rules, callback) {
 					ruleindex++;
 
 					if (ruleindex >= ruleOrder.length) {
-						cmdLines.push('echo --CONTENT_BOUNDARY--;');
-						cmdLines.push(') | /usr/sbin/sendmail -t -v');
-						return callback(null, cmdLines);
+						return callback(null, cmdLines, info);
 					}
 
 					var rule = ruleOrder[ruleindex],
@@ -242,9 +259,10 @@ function build(opts, rules, callback) {
 								lines.push('echo ;');
 								break;
 							case 'contents':
-								var item = rule.value, content;
+								var item = rule.value, content,
+									contentType = (item['content-type'] || 'text/html');
 								lines.push('echo --CONTENT_BOUNDARY;');
-								lines.push('echo \'Content-Type: ' + (item['content-type'] || 'text/html') + '; charset=utf-8\';');
+								lines.push('echo \'Content-Type: ' + contentType + '; charset=utf-8\';');
 								lines.push('echo ;');
 								if (item.template) {
 									content = fs.readFileSync(item.template, 'utf8');
@@ -259,11 +277,19 @@ function build(opts, rules, callback) {
 										value = regexp.key ? getValue(regexp.key) : regexp.value;
 									content = content.replace(new RegExp(pattern, options), value);
 								}
-								lines.push('echo -e ' + JSON.stringify(unescape(content)) + ';');
+								content = JSON.stringify(unescape(content));
+								info.contents.push({
+									'content-type': contentType,
+									'length': content.length,
+									'bytes': Buffer.byteLength(content, 'utf8'),
+									'index': cmdLines.length
+								});
+								lines.push('echo -e ' + content + ';');
 								lines.push('echo ;');
 								break;
 							case 'attachments':
-								var image64, filename;
+								var image64, filename,
+									bytes = 0;
 								item = rule.value;
 
 								if (item.data) {
@@ -295,12 +321,20 @@ function build(opts, rules, callback) {
 								lines.push('echo ;');
 								if (image64) {
 									lines.push('echo ' + image64);
+									bytes = ((image64.length * 3) / 4) - (image64.indexOf('=') > 0 ? 1 : 0);
 								}
+								info.attachments.push({
+									'content-type': item['content-type'],
+									'length': image64 ? image64.length : 0,
+									'bytes': bytes,
+									'index': cmdLines.length
+								});
+
 								lines.push('echo ;');
 								break;
 						}
 
-						cmdLines = cmdLines.concat(lines);
+						cmdLines.push(lines);
 						next();
 					}, rule.key, rule.value, ruleindex);
 				};
@@ -313,11 +347,18 @@ function build(opts, rules, callback) {
 
 //private function
 function send(opts, cmdLines, callback) {
+	var cmd = '(\n';
+	for (var i in cmdLines) {
+		cmd += cmdLines[i].join('\n') + '\n';
+	}
+	cmd += 'echo --CONTENT_BOUNDARY--;\n';
+	cmd += ') | /usr/sbin/sendmail -t -v';
+
 	connect(opts, function(err, client) {
 		if (err) {
 			return callback(err);
 		}
-		exec(opts, client, cmdLines.join('\n'), function(err) {
+		exec(opts, client, cmd, function(err) {
 			if (err) {
 				callback(err);
 			} else {

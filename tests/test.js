@@ -3,8 +3,8 @@
 var dir = process.cwd(),
 	sendemail = require(dir + '/index');
 
-var host_name = '127.0.0.1',
-	user = 'user',
+var host_name = 'localhost',
+	user = 'admin',
 	pass ='password';
 
 var mail = sendemail({
@@ -12,7 +12,7 @@ var mail = sendemail({
 	port: 22,
 	username: user,
 	password: pass,
-	console: function(state, data) {
+	debug: function(state, data) {
 		console.log(state, data);
 	}
 });
@@ -76,7 +76,7 @@ var rules = {
 	]
 };
 
-mail.build(rules, function(err, cmdLines) {
+mail.build(rules, function(err, cmdLines, info) {
 	if (err) {
 		throw err;
 	}
