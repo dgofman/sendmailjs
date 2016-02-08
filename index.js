@@ -162,7 +162,7 @@ function build(opts, rules, callback) {
 			ruleOrder = ruleOrder.concat(rules.to && rules.to.length ? {key: 'to', value: rules.to}: []);
 			ruleOrder = ruleOrder.concat(rules.cc && rules.cc.length ? {key: 'cc', value: rules.cc}: []);
 			ruleOrder = ruleOrder.concat(rules.bcc && rules.bcc.length ? {key: 'bcc', value: rules.bcc}: []);
-			ruleOrder = ruleOrder.concat(rules.subject ? {key: 'subject', value: rules.subject.text}: []);
+			ruleOrder = ruleOrder.concat(rules.subject ? {key: 'subject', value: rules.subject}: []);
 			ruleOrder.push({key: 'MIME'});
 			for (var c in rules.contents) {
 				ruleOrder.push({key: 'contents', value: rules.contents[c]});
@@ -220,7 +220,9 @@ function build(opts, rules, callback) {
 								lines.push('echo Date: ' + unescape(rule.value) + ';');
 								break;
 							case 'subject':
-								lines.push('echo Subject: \'' + unescape(rule.value) + '\';');
+								if (rule.value && rule.value.text) {
+									lines.push('echo Subject: \'' + unescape(rule.value.text) + '\';');
+								}
 								break;
 							case 'from':
 								lines.push(emails('From', [rule.value]));
@@ -251,9 +253,11 @@ function build(opts, rules, callback) {
 								}
 								for (var r in item.regexp) {
 									var regexp = item.regexp[r],
-										pattern = regexp.pattern.split('/'),
+										sIndx = regexp.pattern.lastIndexOf('/'),
+										pattern = regexp.pattern.substring(1, sIndx),
+										options = regexp.pattern.substring(sIndx + 1),
 										value = regexp.key ? getValue(regexp.key) : regexp.value;
-									content = content.replace(new RegExp(pattern[1], pattern[2]), value);
+									content = content.replace(new RegExp(pattern, options), value);
 								}
 								lines.push('echo -e ' + JSON.stringify(unescape(content)) + ';');
 								lines.push('echo ;');

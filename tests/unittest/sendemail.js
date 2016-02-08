@@ -114,6 +114,19 @@ describe('SendMailJS build and send', function () {
 		});
 	});
 
+	it('should test without subject text', function(done) {
+		var oldValue = rules.subject.text,
+			mail = sendemail({
+			});
+
+		delete rules.subject.text;
+		mail.build(rules, function(err) {
+			rules.subject.text = oldValue;
+			assert.ok(err !== null);
+			done();
+		});
+	});
+
 	it('should test intercent function to replace image', function(done) {
 		var mail = sendemail({	
 			username: username,
