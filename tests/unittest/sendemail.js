@@ -49,6 +49,7 @@ var rules = {
 				{"pattern": "/\\${COMPANY}/g", "value": "Softigent Inc."},
 				{"pattern": "/\\${FROM}/g", "key": "team"},
 				{"pattern": "/\\${TO}/g", "key": "to.0.name"},
+				{"pattern": "/\\${INVALID}/g", "key": "invalid.name"},
 				{"pattern": "/\\${DATE}/g", "value": new Date().toGMTString()}
 			]
 		},
