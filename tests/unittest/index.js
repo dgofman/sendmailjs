@@ -8,7 +8,7 @@ var dir = process.cwd(),
 	Server = require(dir + '/node_modules/ssh2/lib/server'),
 	HOST_KEY_RSA = fs.readFileSync(dir + '/node_modules/ssh2/test/fixtures/ssh_host_rsa_key');
 
-var host_name = 'localhost',
+var host_name = '127.0.0.1',
 	port = 22,
 	username = 'admin',
 	password = 'welcome1';
@@ -54,7 +54,7 @@ describe('SendMailJS connect and exec', function () {
 					shell: false, 
 					debug: function(state, data) {
 						assert.equal(state, sendemail.DEBUG);
-						assert.equal(data, 'ready: localhost', 'DEBUG');
+						assert.equal(data, 'ready: 127.0.0.1', 'DEBUG');
 					}
 				});
 
@@ -110,10 +110,10 @@ describe('SendMailJS connect and exec', function () {
 					debug: function(state, data) {
 						states[state] = data;
 						if (state === sendemail.CLOSE) {
-							assert.equal(states[sendemail.DEBUG], 'ready: localhost', 'DEBUG');
+							assert.equal(states[sendemail.DEBUG], 'ready: 127.0.0.1', 'DEBUG');
 							assert.equal(states[sendemail.STDOUT], 'OK', 'STDOUT');
 							assert.equal(states[sendemail.EXIT], exitCode, 'EXIT');
-							assert.equal(states[sendemail.CLOSE], 'localhost', 'CLOSE');
+							assert.equal(states[sendemail.CLOSE], '127.0.0.1', 'CLOSE');
 							done();
 						}
 					}
@@ -163,10 +163,10 @@ describe('SendMailJS connect and exec', function () {
 					debug: function (state, data) {
 						states[state] = data;
 						if (state === sendemail.CLOSE) {
-							assert.equal(states[sendemail.DEBUG], 'ready: localhost', 'DEBUG');
+							assert.equal(states[sendemail.DEBUG], 'ready: 127.0.0.1', 'DEBUG');
 							assert.equal(states[sendemail.STDERR], 'FAULT', 'STDERR');
 							assert.equal(states[sendemail.EXIT], exitCode, 'EXIT');
-							assert.equal(states[sendemail.CLOSE], 'localhost', 'CLOSE');
+							assert.equal(states[sendemail.CLOSE], '127.0.0.1', 'CLOSE');
 							done();
 						}
 					}
@@ -239,7 +239,7 @@ describe('SendMailJS connect and exec', function () {
 					debug: function (state, data) {
 							states[state] = data;
 							if (state === sendemail.STDERR) {
-								assert.equal(states[sendemail.DEBUG], 'ready: localhost', 'DEBUG');
+								assert.equal(states[sendemail.DEBUG], 'ready: 127.0.0.1', 'DEBUG');
 								assert.equal(states[sendemail.STDERR], 'Error: No response from server', 'STDERR');
 								done();
 							}
@@ -273,10 +273,10 @@ describe('SendMailJS connect and exec', function () {
 					debug: function (state, data) {
 							states[state] = data;
 							if (state === sendemail.CLOSE) {
-								assert.equal(states[sendemail.DEBUG], 'ready: localhost', 'DEBUG');
+								assert.equal(states[sendemail.DEBUG], 'ready: 127.0.0.1', 'DEBUG');
 								assert.equal(states[sendemail.STDOUT], 'OK', 'STDOUT');
 								assert.equal(states[sendemail.EXIT], exitCode, 'EXIT');
-								assert.equal(states[sendemail.CLOSE], 'localhost', 'CLOSE');
+								assert.equal(states[sendemail.CLOSE], '127.0.0.1', 'CLOSE');
 								done();
 							}
 						}
@@ -319,10 +319,10 @@ describe('SendMailJS connect and exec', function () {
 					debug: function (state, data) {
 							states[state] = data;
 							if (state === sendemail.CLOSE) {
-								assert.equal(states[sendemail.DEBUG], 'ready: localhost', 'DEBUG');
+								assert.equal(states[sendemail.DEBUG], 'ready: 127.0.0.1', 'DEBUG');
 								assert.equal(states[sendemail.STDERR], 'FAULT', 'STDOUT');
 								assert.equal(states[sendemail.EXIT], exitCode, 'EXIT');
-								assert.equal(states[sendemail.CLOSE], 'localhost', 'CLOSE');
+								assert.equal(states[sendemail.CLOSE], '127.0.0.1', 'CLOSE');
 								done();
 							}
 						}

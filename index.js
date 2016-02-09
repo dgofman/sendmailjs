@@ -1,6 +1,7 @@
 'use strict';
 
 var ssh2 = require('ssh2'),
+	child_process = require('child_process'),
 	fs = require('fs'),
 	defConsole = function(
 		// jshint ignore:start
@@ -75,56 +76,66 @@ module.exports = sendmailjs = function(opts) {
 //private function
 function connect(opts, callback) {
 	var debug = opts.debug || defConsole;
+	if (opts.hosts.length === 1 && opts.hosts[0] === 'localhost') {
+		opts.localhost = true;
+	}
 
 	if (opts.hostIndex < opts.hosts.length) {
-		var client = new ssh2(),
-			ip = opts.hosts[opts.hostIndex++],
-			node = {
-				host: ip,
-				port: opts.port,
-				username: opts.username,
-				readyTimeout: opts.timeout || 2000
-			};
+		var client;
+		if (opts.localhost) {
+			client = child_process;
+			callback(null, client, null);
+		} else {
+			client = new ssh2();
 
-		if (opts.privateKey) {
-			node.privateKey = opts.privateKey;
-		}
-		if (opts.password) {
-			node.password = opts.password;
-		}
+			var ip = opts.hosts[opts.hostIndex++],
+				node = {
+					host: ip,
+					port: opts.port,
+					username: opts.username,
+					readyTimeout: opts.timeout || 2000
+				};
 
-		client.ip = ip;
-
-		client.on('ready', function() {
-			debug(sendmailjs.DEBUG, 'ready: ' + ip);
-
-			if (opts.shell === true) {
-				client.shell(function(err, stream) {
-					var code = 0;
-					if (err) {
-						return callback(err);
-					}
-					stream.on('exit', function(code) {
-						debug(sendmailjs.EXIT, code);
-						client.end();
-					});
-					stream.on('close', function() {
-						debug(sendmailjs.CLOSE, ip);
-						client.end();
-					});
-					stream.on('data', function(data) {
-						debug(sendmailjs.STDOUT, data.toString());
-					});
-					stream.stderr.on('data', function(data) {
-						code = -1;
-						debug(sendmailjs.STDERR, data.toString());
-					});
-					callback(null, client, stream);
-				});
-			} else {
-				callback(null, client, null);
+			if (opts.privateKey) {
+				node.privateKey = opts.privateKey;
 			}
-		}).connect(node);
+			if (opts.password) {
+				node.password = opts.password;
+			}
+
+			client.ip = ip;
+
+			client.on('ready', function() {
+				debug(sendmailjs.DEBUG, 'ready: ' + ip);
+
+				if (opts.shell === true) {
+					client.shell(function(err, stream) {
+						var code = 0;
+						if (err) {
+							return callback(err);
+						}
+						stream.on('exit', function(code) {
+							debug(sendmailjs.EXIT, code);
+							client.end();
+						});
+						stream.on('close', function() {
+							debug(sendmailjs.CLOSE, ip);
+							client.end();
+						});
+						stream.on('data', function(data) {
+							debug(sendmailjs.STDOUT, data.toString());
+						});
+						stream.stderr.on('data', function(data) {
+							code = -1;
+							debug(sendmailjs.STDERR, data.toString());
+						});
+						callback(null, client, stream);
+					});
+				} else {
+					callback(null, client, null);
+				}
+			}).connect(node);
+		}
 	} else {
 		debug(sendmailjs.DEBUG, 'Missing host list');
 		callback(new Error('Missing host list'), null);
@@ -139,29 +150,40 @@ function connect(opts, callback) {
 function exec(opts, client, cmd, callback) {
 	var debug = opts.debug || defConsole;
 
-	client.exec(cmd, { pty: false }, function(err, stream) {
-		var stderr = '';
-		if (err) {
-			debug(sendmailjs.STDERR, err.toString());
-			return callback(err);
-		}
-		stream.on('exit', function(code) {
-			debug(sendmailjs.EXIT, code);
-			client.end();
+	if (opts.localhost) {
+		client.exec(cmd, function (error, stdout) {
+			if (stdout) {
+				debug(sendmailjs.STDOUT, stdout);
+			} else {
+				debug(sendmailjs.STDERR, error);
+			}
+			callback(error, stdout);
 		});
-		stream.on('close', function() {
-			debug(sendmailjs.CLOSE, client.ip);
-			client.end();
+	} else {
+		client.exec(cmd, { pty: false }, function(err, stream) {
+			var stderr = '';
+			if (err) {
+				debug(sendmailjs.STDERR, err.toString());
+				return callback(err);
+			}
+			stream.on('exit', function(code) {
+				debug(sendmailjs.EXIT, code);
+				client.end();
+			});
+			stream.on('close', function() {
+				debug(sendmailjs.CLOSE, client.ip);
+				client.end();
+			});
+			stream.on('data', function(data) {
+				debug(sendmailjs.STDOUT, data.toString());
+			});
+			stream.stderr.on('data', function(data) {
+				stderr += data;
+				debug(sendmailjs.STDERR, data.toString());
+			});
+			callback(null, stream);
 		});
-		stream.on('data', function(data) {
-			debug(sendmailjs.STDOUT, data.toString());
-		});
-		stream.stderr.on('data', function(data) {
-			stderr += data;
-			debug(sendmailjs.STDERR, data.toString());
-		});
-		callback(null, stream);
-	});
+	}
 }
 
 //private function

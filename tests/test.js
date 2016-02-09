@@ -80,6 +80,8 @@ mail.build(rules, function(err, cmdLines, info) {
 	if (err) {
 		throw err;
 	}
+	console.log(info);
+	
 	mail.send(cmdLines, function(err, result) {
 		if (err) {
 			throw err;

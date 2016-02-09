@@ -7,9 +7,10 @@ var dir = process.cwd(),
 	Server = require(dir + '/node_modules/ssh2/lib/server'),
 	HOST_KEY_RSA = fs.readFileSync(dir + '/node_modules/ssh2/test/fixtures/ssh_host_rsa_key');
 
-var host_name = 'localhost',
+var host_name = '127.0.0.1',
 	port = 22,
-	username = 'admin';
+	username = 'admin',
+	password = 'pwd';
 
 var rules = {
 	"team": "Softigent Team.",
@@ -133,6 +134,7 @@ describe('SendMailJS build and send', function () {
 	it('should test intercent function to replace image', function(done) {
 		var mail = sendemail({	
 			username: username,
+			password: password,
 			intercept: function(next, rulekey, rulevalue) {
 				if (rulekey === 'attachments' && rulevalue.name === 'avatar.png') {
 					rulevalue.data = new Buffer(fs.readFileSync(dir + "/tests/images/indigo_logo.png")).toString('base64');
@@ -213,6 +215,44 @@ describe('SendMailJS build and send', function () {
 			});
 
 			mail.send([['']], function(err) {
+				assert.ok(err !== null);
+				done();
+			});
+		});
+	});
+
+	it('should test sendmail using child_proccess (localhost)', function(done) {
+		var mail = sendemail({
+			hosts: ['localhost'],
+			port: port
+		});
+
+		mail.connect(function(err, client) {
+			var oldExec = client.exec;
+			client.exec = function(cmd, callback) {
+				callback(null, 'SENT');
+			};
+			mail.exec(client, '', function(err) {
+				client.exec = oldExec;
+				assert.ok(err === null);
+				done();
+			});
+		});
+	});
+
+	it('should test sendmail on error using child_proccess (localhost)', function(done) {
+		var mail = sendemail({
+			hosts: ['localhost'],
+			port: port
+		});
+
+		mail.connect(function(err, client) {
+			var oldExec = client.exec;
+			client.exec = function(cmd, callback) {
+				callback('ERROR');
+			};
+			mail.exec(client, '', function(err) {
+				client.exec = oldExec;
 				assert.ok(err !== null);
 				done();
 			});
