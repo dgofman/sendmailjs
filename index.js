@@ -215,7 +215,9 @@ function build(opts, rules, callback) {
 					var keys = key.split('.'),
 						source = rules;
 					for (var i in keys) {
-						source = source[keys[i]];
+						if (source) {
+							source = source[keys[i]];
+						}
 					}
 					return source;
 				},
