@@ -164,12 +164,11 @@ function connect(opts, callback) {
 
 //private function
 function exec(opts, client, cmd, callback, fileName) {
-	var debug = opts.debug || defConsole,
-		sendmailPipe = ' | /usr/sbin/sendmail -t -v';
+	var debug = opts.debug || defConsole;
 
 	if (opts.localhost) {
 		if (cmd === 'send') {
-			cmd = 'cat ' + fileName + sendmailPipe;
+			cmd = 'sh ' + fileName;
 		}
 		client.exec(cmd, function (error, stdout) {
 			if (stdout) {
@@ -181,7 +180,7 @@ function exec(opts, client, cmd, callback, fileName) {
 		});
 	} else {
 		if (cmd === 'send') {
-			cmd = fs.readFileSync(fileName, 'utf8') + sendmailPipe;
+			cmd = fs.readFileSync(fileName, 'utf8');
 		}
 
 		//Warning by execute the large comand line argument you may get an error
@@ -408,7 +407,7 @@ function send(opts, cmdLines, callback) {
 		cmd += cmdLines[i].join('\n') + '\n';
 	}
 	cmd += 'echo --CONTENT_BOUNDARY--;\n';
-	cmd += ')';
+	cmd += ') | /usr/sbin/sendmail -t -v';
 
 	debug('History Size: ' + lastMailHistory.length + ', Max Size: ' + opts.history_limit);
 	if (lastMailHistory.length >= opts.history_limit) {
