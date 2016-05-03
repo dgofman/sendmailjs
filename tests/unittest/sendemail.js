@@ -166,8 +166,9 @@ describe('SendMailJS build and send', function () {
 			var mail = sendemail({
 				hosts: [host_name],
 				port: port,	
-				username: username
-				});
+				username: username,
+				history_limit: 1
+			});
 
 			server.on('connection', function(conn) {
 				conn.on('authentication', function(ctx) {
@@ -256,6 +257,34 @@ describe('SendMailJS build and send', function () {
 				assert.ok(err !== null);
 				done();
 			});
+		});
+	});
+
+	it('should test send command', function(done) {
+		var mail = sendemail({
+			hosts: ['localhost'],
+			port: port
+		});
+
+		var path = require('path'),
+			files = fs.readdirSync('./tmp'),
+			fileName;
+		for (var i in files) {
+			fileName = path.resolve('./tmp/' + files[i]);
+			break;
+		}
+
+		mail.connect(function(err, client) {
+			var oldExec = client.exec;
+			client.exec = function(cmd, callback) {
+				assert.ok(cmd.indexOf(fileName) !== -1);
+				callback(cmd);
+			};
+			mail.exec(client, 'send', function(err) {
+				client.exec = oldExec;
+				assert.ok(err !== null);
+				done();
+			}, fileName);
 		});
 	});
 });

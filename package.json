@@ -1,6 +1,6 @@
 {
   "name": "sendmailjs",
-  "version": "0.0.8",
+  "version": "0.0.9",
   "description": "Sendmail via unix mail",
   "main": "index.js",
   "scripts": {

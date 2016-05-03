@@ -3,6 +3,8 @@
 var ssh2 = require('ssh2'),
 	child_process = require('child_process'),
 	fs = require('fs'),
+	lastMailHistory = [],
+	historyDir = __dirname + '/tmp',
 	defConsole = function(
 		// jshint ignore:start
 		state, data
@@ -19,6 +21,18 @@ var ssh2 = require('ssh2'),
 	},
 	sendmailjs;
 
+/* istanbul ignore next */
+if (!fs.existsSync(historyDir)) {
+	fs.mkdirSync(historyDir);
+}
+
+var files = fs.readdirSync(historyDir);
+/* istanbul ignore next */
+for (var i in files) {
+	fs.unlinkSync(historyDir + '/' + files[i]);
+}
+
+
 /**
 	opts - JSON
 
@@ -31,6 +45,7 @@ var ssh2 = require('ssh2'),
 		privateKey: pks, 	//privateKeyString,
 		shell: false,		//open SSH shell,
 		timeout: 2000,		//connect timeout,
+		history_limit: 10	//limit of last mail queue
 		debug: function(state, data) { //{Optional} - debug output
 			console.log(state, data);	 //state - 5 states: CLOSE/EXIT/STDOUT/STDERR/DEBUG
 		}),								 //data - output value
@@ -44,6 +59,7 @@ module.exports = sendmailjs = function(opts) {
 	opts.hostIndex = opts.hostIndex || 0;
 	opts.hosts = opts.hosts || ['localhost'];
 	opts.port = opts.port || 22;
+	opts.history_limit = opts.history_limit || 10;
 
 	return {
 		/**
@@ -56,7 +72,7 @@ module.exports = sendmailjs = function(opts) {
 			callback(null, stream);
 		*/
 		exec: function(client, cmd, callback) {
-			exec(opts, client, cmd, callback);
+			exec(opts, client, cmd, callback, arguments[3]);
 		},
 		/**
 			callback(err, cmdLines, resourceInfo);
@@ -147,10 +163,14 @@ function connect(opts, callback) {
 }
 
 //private function
-function exec(opts, client, cmd, callback) {
-	var debug = opts.debug || defConsole;
+function exec(opts, client, cmd, callback, fileName) {
+	var debug = opts.debug || defConsole,
+		sendmailPipe = ' | /usr/sbin/sendmail -t -v';
 
 	if (opts.localhost) {
+		if (cmd === 'send') {
+			cmd = 'cat ' + fileName + sendmailPipe;
+		}
 		client.exec(cmd, function (error, stdout) {
 			if (stdout) {
 				debug(sendmailjs.STDOUT, stdout);
@@ -160,6 +180,15 @@ function exec(opts, client, cmd, callback) {
 			callback(error, stdout);
 		});
 	} else {
+		if (cmd === 'send') {
+			cmd = fs.readFileSync(fileName, 'utf8') + sendmailPipe;
+		}
+
+		//Warning by execute the large comand line argument you may get an error
+		//Error: Packet corrupt
+		//The actual error is "spawn E2BIG" means that the argument list is too long
+		//Please run getconf ARG_MAX to check the max argument size (in bytes) 
+
 		client.exec(cmd, { pty: false }, function(err, stream) {
 			var stderr = '';
 			if (err) {
@@ -371,24 +400,46 @@ function build(opts, rules, callback) {
 
 //private function
 function send(opts, cmdLines, callback) {
-	var cmd = '(\n';
+	var debug = opts.debug || defConsole,
+		fileName = historyDir + '/mail' + Date.now() + '_' + Math.floor((1 + Math.random()) * 0x10000),
+		cmd = '(\n';
+
 	for (var i in cmdLines) {
 		cmd += cmdLines[i].join('\n') + '\n';
 	}
 	cmd += 'echo --CONTENT_BOUNDARY--;\n';
-	cmd += ') | /usr/sbin/sendmail -t -v';
+	cmd += ')';
 
-	connect(opts, function(err, client) {
-		if (err) {
-			return callback(err);
+	debug('History Size: ' + lastMailHistory.length + ', Max Size: ' + opts.history_limit);
+	if (lastMailHistory.length >= opts.history_limit) {
+		try {
+			fs.unlinkSync(lastMailHistory.shift());
+		} catch (e) {
+			/* istanbul ignore next */
+			console.error(e);
 		}
-		exec(opts, client, cmd, function(err) {
-			if (err) {
-				callback(err);
-			} else {
-				callback(err, 'SENT');
-			}
-		});
+	}
+
+	fs.writeFile(fileName, cmd, function (err) {
+		/* istanbul ignore next */
+		if (err) {
+			callback(err);
+		} else {
+			lastMailHistory.push(fileName);
+			debug('Saved File: ' + fileName);
+			connect(opts, function(err, client) {
+				if (err) {
+					return callback(err);
+				}
+				exec(opts, client, 'send', function(err) {
+					if (err) {
+						callback(err);
+					} else {
+						callback(err, 'SENT');
+					}
+				}, fileName);
+			});
+		}
 	});
 }
 
