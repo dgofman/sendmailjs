@@ -88,11 +88,14 @@ describe('SendMailJS build and send', function () {
 
 	it('should test build command', function(done) {
 		var mail = sendemail({
+			echo: 'ECHO -e ',
+			echo_line: 'ECHO '
 		});
 		mail.build(rules, function(err, cmdLines, info) {
-			assert.ok(err === null);
-			assert(info.contents.length, 3);
-			assert(info.attachments.length, 2);
+			assert.equal(err, null);
+			assert.equal(info.contents.length, 3);
+			assert.equal(info.attachments.length, 4);
+			assert.equal(cmdLines[0][0], 'ECHO -e Date: $(date -R)');
 			done();
 		});
 	});
@@ -131,37 +134,41 @@ describe('SendMailJS build and send', function () {
 		});
 	});
 
-	it('should test intercent function to replace image', function(done) {
-		var mail = sendemail({	
+	it('should test intercent function callback', function(done) {
+		var str = 'THIS IS A JSON',
+			mail = sendemail({	
 			username: username,
 			password: password,
-			intercept: function(next, rulekey, rulevalue) {
-				if (rulekey === 'attachments' && rulevalue.name === 'avatar.png') {
+			intercept: function(next, rulekey, rulevalue, cmdLines, info) {
+				if (rulekey === 'contents') {
+					if (info.contents.length === 0) { //replace first content with custom json
+						var json = {key: str};
+						info.contents.push({
+							'content-type': 'text/json',
+							'length': JSON.stringify(json).length,
+							'index': cmdLines.length
+						});
+						cmdLines.push([json]);
+						return next(true);
+					}
+				} else if (rulekey === 'attachments' && rulevalue.name === 'avatar.png') {
+					rulevalue['content-type'] = 'image/mypng';
 					rulevalue.data = new Buffer(fs.readFileSync(dir + "/tests/images/indigo_logo.png")).toString('base64');
 				}
 				next();
 			}
 		});
 
-		mail.build(rules, function(err) {
-			assert.ok(err === null);
+		mail.build(rules, function(err, cmdLines, info) {
+			assert.equal(err, null);
+			assert.equal(info.contents.length, 3);
+			assert.equal(cmdLines[info.contents[0].index][0].key, str);
+			assert.equal(info.attachments.length, 4);
 			done();
 		});
 	});
 
-	it('should test error on missing hosts', function(done) {
-		var mail = sendemail({
-			hosts: []
-		});
-
-		mail.send([], function(err) {
-			assert.ok(err !== null);
-			assert.equal(err.message, 'Missing host list');
-			done();
-		});
-	});
-
-	it('should test send email', function(done) {
+	it('should test send email and history file limit', function(done) {
 		createServer(function(server) {
 			var mail = sendemail({
 				hosts: [host_name],
@@ -185,10 +192,14 @@ describe('SendMailJS build and send', function () {
 				});
 			});
 
-			mail.send([], function(err, result) {
+			mail.send([ ['line1'] ], function(err, result) {
 				assert.ok(err === null);
-				assert.equal(result, 'SENT');
-				done();
+				assert.equal(result, 'SENDING...');
+				mail.send([ ['line1'] ], function(err, result) {
+					assert.ok(err === null);
+					assert.equal(result, 'SENDING...');
+					done();
+				});
 			});
 		});
 	});
@@ -215,7 +226,7 @@ describe('SendMailJS build and send', function () {
 				});
 			});
 
-			mail.send([['']], function(err) {
+			mail.send('', function(err) {
 				assert.ok(err !== null);
 				done();
 			});
@@ -231,7 +242,7 @@ describe('SendMailJS build and send', function () {
 		mail.connect(function(err, client) {
 			var oldExec = client.exec;
 			client.exec = function(cmd, callback) {
-				callback(null, 'SENT');
+				callback(null, 'SENDING...');
 			};
 			mail.exec(client, '', function(err) {
 				client.exec = oldExec;

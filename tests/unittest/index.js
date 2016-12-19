@@ -32,18 +32,32 @@ describe('SendMailJS connect and exec', function () {
 	});
 
 	it('should test without hosts', function(done) {
-		var mail = sendemail({
-			hosts: [],
-			port: port,	
-			username: username
-		});
-		mail.connect(function(err, stream) {
-			assert.ok(err !== null);
-			assert.equal(err.message, 'Missing host list');
-			assert.equal(stream, null);
-			done();
-		});
+		var opts = {};
+		sendemail(opts);
+		assert.equal(opts.hosts[0], 'localhost');
+		done();
 	});
+
+	it('should test hosts as string', function(done) {
+		var opts = {
+			hosts: 'smtp.google.com'
+		};
+		sendemail(opts);
+		assert.equal(opts.hosts[0], 'smtp.google.com');
+		done();
+	});
+
+	it('should test empty hosts definition', function(done) {
+		try {
+			sendemail({
+				hosts: []
+			});
+		} catch(e) {
+			assert.equal(e.message, 'Server hosts array is empty.');
+			done();
+		}
+	});
+
 
 	it('should test Shell flag is false', function(done) {
 		createServer(function(server) {
@@ -97,7 +111,7 @@ describe('SendMailJS connect and exec', function () {
 		});
 	});
 
-	it('should test valid shell communication', function(done) {
+	it('should test valid shell communication using emit callback', function(done) {
 		createServer(function(server) {
 			var exitCode = 0,
 				states = {},
@@ -107,7 +121,7 @@ describe('SendMailJS connect and exec', function () {
 					username: username,
 					password: password,
 					shell: true,
-					debug: function(state, data) {
+					emit: function(state, data) {
 						states[state] = data;
 						if (state === sendemail.CLOSE) {
 							assert.equal(states[sendemail.DEBUG], 'ready: 127.0.0.1', 'DEBUG');
@@ -144,7 +158,6 @@ describe('SendMailJS connect and exec', function () {
 			});
 
 			mail.connect(function(err, client, stream) {
-				assert.ok(err === null);
 				stream.end('exit');
 			});
 		});
@@ -160,7 +173,7 @@ describe('SendMailJS connect and exec', function () {
 					username: username,
 					password: password,
 					shell: true,
-					debug: function (state, data) {
+					emit: function (state, data) {
 						states[state] = data;
 						if (state === sendemail.CLOSE) {
 							assert.equal(states[sendemail.DEBUG], 'ready: 127.0.0.1', 'DEBUG');
@@ -236,10 +249,10 @@ describe('SendMailJS connect and exec', function () {
 					port: port,	
 					username: username,
 					shell: false,
-					debug: function (state, data) {
+					emit: function (state, data) {
 							states[state] = data;
 							if (state === sendemail.STDERR) {
-								assert.equal(states[sendemail.DEBUG], 'ready: 127.0.0.1', 'DEBUG');
+								assert.equal(states[sendemail.DEBUG], 'host: 127.0.0.1', 'DEBUG');
 								assert.equal(states[sendemail.STDERR], 'Error: No response from server', 'STDERR');
 								done();
 							}
@@ -270,10 +283,10 @@ describe('SendMailJS connect and exec', function () {
 					port: port,	
 					username: username,
 					shell: false,
-					debug: function (state, data) {
+					emit: function (state, data) {
 							states[state] = data;
 							if (state === sendemail.CLOSE) {
-								assert.equal(states[sendemail.DEBUG], 'ready: 127.0.0.1', 'DEBUG');
+								assert.equal(states[sendemail.DEBUG], 'host: 127.0.0.1', 'DEBUG');
 								assert.equal(states[sendemail.STDOUT], 'OK', 'STDOUT');
 								assert.equal(states[sendemail.EXIT], exitCode, 'EXIT');
 								assert.equal(states[sendemail.CLOSE], '127.0.0.1', 'CLOSE');
@@ -316,10 +329,10 @@ describe('SendMailJS connect and exec', function () {
 					port: port,	
 					username: username,
 					shell: false,
-					debug: function (state, data) {
+					emit: function (state, data) {
 							states[state] = data;
 							if (state === sendemail.CLOSE) {
-								assert.equal(states[sendemail.DEBUG], 'ready: 127.0.0.1', 'DEBUG');
+								assert.equal(states[sendemail.DEBUG], 'host: 127.0.0.1', 'DEBUG');
 								assert.equal(states[sendemail.STDERR], 'FAULT', 'STDOUT');
 								assert.equal(states[sendemail.EXIT], exitCode, 'EXIT');
 								assert.equal(states[sendemail.CLOSE], '127.0.0.1', 'CLOSE');
