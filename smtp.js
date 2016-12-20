@@ -10,7 +10,8 @@ module.exports = function(opts, cmdLines, callback) {
 		host = sendmailjs.getHost(opts),
 		client = new net.Socket(),
 		end_line = '\r\n',
-		index250 = 0;
+		rules = JSON.parse(JSON.stringify(opts.rules)),
+		tasks = ['MAIL FROM', 'RCPT TO', 'DATA', 'QUIT'];
 	client.setEncoding('ascii');
 	client.on('error', function (err) {
 		emit(sendmailjs.STDERR, err.toString());
@@ -32,17 +33,30 @@ module.exports = function(opts, cmdLines, callback) {
 					case '220':
 						return client.write('EHLO ' + os.hostname() + end_line);
 					case '250':
-						index250++;
-						if (index250 === 1) {
-							return client.write('MAIL FROM: dgofman@gmail.com' + end_line);
+						if (tasks[0] === 'MAIL FROM') {
+							client.write('MAIL FROM: ' + rules.from.email + end_line);
+							return tasks.shift(0);
 						}
-						if (index250 === 2) {
-							return client.write('RCPT TO: dgofman@equinix.com'	+ end_line);
+						if (tasks[0] === 'RCPT TO') {
+							if (rules.to && rules.to.length) {
+								client.write('RCPT TO: ' + rules.to[0].email + end_line);
+								return rules.to.shift(0);
+							} else if (rules.cc && rules.cc.length) {
+								client.write('RCPT TO: ' + rules.cc[0].email + end_line);
+								return rules.cc.shift(0);
+							} else if (rules.bcc && rules.bcc.length) {
+								client.write('RCPT TO: ' + rules.bcc[0].email + end_line);
+								return rules.bcc.shift(0);
+							} else {
+								tasks.shift(0);
+							}
 						}
-						if (index250 === 3) {
-							return client.write('DATA' + end_line);
+						if (tasks[0] === 'DATA') {
+							client.write('DATA' + end_line);
+							return tasks.shift(0);
+						} else {
+							client.write('QUIT' + end_line);
 						}
-						client.write('QUIT' + end_line);
 						break;
 					case '354':
 						var cmd = [];
@@ -57,6 +71,6 @@ module.exports = function(opts, cmdLines, callback) {
 						return client.destroy();
 				}
 			}
-		}, client, arr[0], data, index250);
+		}, client, arr[0], data, tasks);
 	});
 };

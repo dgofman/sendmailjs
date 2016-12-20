@@ -215,6 +215,8 @@ function build(opts, rules, callback) {
 
 	rules = rules || {};
 
+	opts.rules = rules;
+
 	try {
 		var ruleOrder = [];
 			ruleOrder = ruleOrder.concat(rules.date ? {key: 'date', value: rules.date}: []);

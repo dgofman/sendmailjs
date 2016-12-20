@@ -5,6 +5,35 @@ var dir = process.cwd(),
 	net = require('net'),
 	assert = require('assert');
 
+var rules = {
+	"date": "$(date -R)", 
+	"from": {
+		"name": "DO NOT REPLY",
+		"email": "donot_reply@softigent.com"
+	},
+	"to": [
+		{
+			"name": "David Gofman",
+			"email": "dgofman@gmail.com"
+		}
+	],
+	"cc": [
+		{
+			"name": "David Gofman",
+			"email": "dgofman@gmail.com"
+		}
+	],
+	"bcc": [
+		{
+			"name": "David Gofman",
+			"email": "dgofman@gmail.com"
+		}
+	],
+	"subject": {
+		"text": "Test"
+	}
+};
+
 describe('SMTP', function () {
 
 	it('should validate default opts', function(done) {
@@ -31,38 +60,30 @@ describe('SMTP', function () {
 	});
 
 	it('should test SMTP send mail', function(done) {
-		var index = 0, clientSocket;
+		var clientSocket;
 		createServer(function(socket) {
 			clientSocket = socket;
 			socket.on('data', function(data) {
-				index++;
 				var str = data.toString();
 				if (str.indexOf('EHLO') === 0) {
-					assert.equal(index, 1);
 					return socket.write('250-localhost Hello [127.0.0.1]');
 				}
 				if (str.indexOf('MAIL FROM:') === 0) {
-					assert.equal(index, 2);
 					return socket.write('250 2.1.0 Sender OK');
 				}
 				if (str.indexOf('RCPT TO:') === 0) {
-					assert.equal(index, 3);
 					return socket.write('250 2.1.5 Recipient OK');
 				}
 				if (str.indexOf('DATA') === 0) {
-					assert.equal(index, 4);
 					return socket.write('354 Start mail input; end with <CRLF>.<CRLF>');
 				}
 				if (str.indexOf('--CONTENT_BOUNDARY--') !== -1) {
-					assert.equal(index, 5);
 					return socket.write('250 2.6.0. Queued mail for delivery');
 				}
 				if (str.indexOf('QUIT') === 0) {
-					assert.equal(index, 6);
 					return socket.write('500 DO NOT CLOSE YET!');
 				}
 				if (str.indexOf('CLOSE NOW!') === 0) {
-					assert.equal(index, 7);
 					return socket.write('221 2.0.0 Service closing transmission channel');
 				}
 			});
@@ -76,8 +97,10 @@ describe('SMTP', function () {
 			var opts = {
 				smtp: true,
 				port: port,
-				intercept: function(next, client, state, data) {
+				intercept: function(next, client, state, data, tasks) {
 					if (state === '500') {
+						assert.equal(tasks.length, 1);
+						assert.equal(tasks[0], 'QUIT');
 						assert.equal(data, '500 DO NOT CLOSE YET!');
 						client.write('CLOSE NOW!' + '\n');
 						return next(true);
@@ -86,12 +109,11 @@ describe('SMTP', function () {
 				}
 			}, mail = sendemail(opts);
 
-			mail.send({ contents: [{
-					'content-type': 'text/plain',
-					'content': 'Hello World!'
-				}] }, function(err, result) {
+			mail.build(rules, function(err, cmdLines) {
+				mail.send(cmdLines, function(err, result) {
 					assert.equal(err, null);
 					assert.equal(result, 'CLOSED');
+				});
 			});
 		});
 	});
@@ -101,10 +123,12 @@ describe('SMTP', function () {
 			smtp: true,
 			port: 65535
 		}, mail = sendemail(opts);
-		mail.send(null, function(err) {
-			assert.equal(err.code, 'ECONNREFUSED');
-			assert.equal(err.errno, 'ECONNREFUSED');
-			done();
+		mail.build(rules, function(err, cmdLines) {
+			mail.send(cmdLines, function(err) {
+				assert.equal(err.code, 'ECONNREFUSED');
+				assert.equal(err.errno, 'ECONNREFUSED');
+				done();
+			});
 		});
 	});
 });
